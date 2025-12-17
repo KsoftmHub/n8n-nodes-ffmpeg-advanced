@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.0.1...v1.0.2) (2025-12-17)
+
+
+### Bug Fixes
+
+* add esbuild script to compile FFmpeg node ([b766cef](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/commit/b766cefe0363516c7149a56fde2867034f60ea6b))
+
 ## [1.0.1](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.0.0...v1.0.1) (2025-12-17)
 
 
