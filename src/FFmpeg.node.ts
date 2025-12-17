@@ -282,6 +282,42 @@ export class FFmpeg implements INodeType {
         description: 'The file extension for the resulting file (e.g. mp4, mp3)',
       },
       // ----------------------------------
+      // Save Options
+      // ----------------------------------
+      {
+        displayName: 'Save to File',
+        name: 'saveToFile',
+        type: 'boolean',
+        default: false,
+        description: 'Whether to save the processed file to a specific path on the disk instead of returning binary data',
+      },
+      {
+        displayName: 'Output File Path',
+        name: 'filePath',
+        type: 'string',
+        default: '',
+        placeholder: '/path/to/output/video.mp4',
+        displayOptions: {
+          show: {
+            saveToFile: [true],
+          },
+        },
+        description: 'Full absolute path where the file should be saved. Ensure the directory exists and is writable.',
+      },
+      {
+        displayName: 'Output Filename',
+        name: 'fileName',
+        type: 'string',
+        default: '',
+        placeholder: 'my_video',
+        displayOptions: {
+          show: {
+            saveToFile: [false],
+          },
+        },
+        description: 'Optional custom filename (without extension) for the binary data. If empty, a UUID will be used.',
+      },
+      // ----------------------------------
       // Standard Properties
       // ----------------------------------
       {
@@ -303,6 +339,8 @@ export class FFmpeg implements INodeType {
       try {
         const operation = this.getNodeParameter('operation', i) as string;
         const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
+        const saveToFile = this.getNodeParameter('saveToFile', i) as boolean;
+
 
         if (!items[i].binary || !items[i].binary![binaryPropertyName]) {
           throw new Error(`Item ${i} does not contain binary data with name "${binaryPropertyName}"`);
@@ -443,20 +481,50 @@ export class FFmpeg implements INodeType {
             .save(outputFilePath);
         });
 
-        // Read output back to buffer
-        const outputBuffer = fs.readFileSync(outputFilePath);
+        if (saveToFile) {
+          // Save to specific path
+          const targetPath = this.getNodeParameter('filePath', i) as string;
 
-        // Prepare Binary Data
-        const binaryData: IBinaryKeyData = {};
-        binaryData[binaryPropertyName] = await this.helpers.prepareBinaryData(
-          outputBuffer,
-          `${outputFileName}.${outputExtension}`
-        );
+          if (!targetPath) {
+             throw new Error('File path is required when "Save to File" is enabled.');
+          }
 
-        returnData.push({
-          json: items[i].json,
-          binary: binaryData,
-        });
+          // Ensure directory exists
+          const targetDir = path.dirname(targetPath);
+          if (!fs.existsSync(targetDir)) {
+             fs.mkdirSync(targetDir, { recursive: true });
+          }
+
+          fs.copyFileSync(outputFilePath, targetPath);
+
+          returnData.push({
+            json: {
+              ...items[i].json,
+              outputFilePath: targetPath,
+              saved: true
+            },
+            binary: {},
+          });
+
+        } else {
+          // Return as Binary Data
+          const outputBuffer = fs.readFileSync(outputFilePath);
+
+          const customFileName = this.getNodeParameter('fileName', i) as string;
+          const finalFileName = customFileName ? `${customFileName}.${outputExtension}` : `${outputFileName}.${outputExtension}`;
+
+          // Prepare Binary Data
+          const binaryData: IBinaryKeyData = {};
+          binaryData[binaryPropertyName] = await this.helpers.prepareBinaryData(
+            outputBuffer,
+            finalFileName
+          );
+
+          returnData.push({
+            json: items[i].json,
+            binary: binaryData,
+          });
+        }
 
         // Cleanup temporary files
         if (fs.existsSync(inputFilePath)) fs.unlinkSync(inputFilePath);
