@@ -19,7 +19,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "main": "index.js",
+  "main": "dist/FFmpeg.node.js",
   "n8n": {
     "nodes": [
       "dist/FFmpeg.node.js"
