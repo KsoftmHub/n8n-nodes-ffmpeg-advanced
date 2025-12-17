@@ -61,6 +61,11 @@ export class FFmpeg implements INodeType {
             value: 'custom',
             description: 'Run raw FFmpeg arguments for complex filters',
           },
+          {
+            name: 'Image to Video',
+            value: 'imageToVideo',
+            description: 'Convert static image to video with effects',
+          },
         ],
         default: 'convert',
       },
@@ -208,6 +213,48 @@ export class FFmpeg implements INodeType {
         default: 'mp3',
       },
       // ----------------------------------
+      // Operation: Image to Video
+      // ----------------------------------
+      {
+        displayName: 'Presets',
+        name: 'animationPreset',
+        type: 'options',
+        displayOptions: {
+          show: {
+            operation: ['imageToVideo'],
+          },
+        },
+        options: [
+          { name: 'Simple Loop', value: 'simple' },
+          { name: 'Zoom Pan', value: 'zoompan', description: 'Slow 1.5x zoom effect' },
+          { name: 'YouTube Shorts', value: 'shorts', description: '9:16 crop + zoom' },
+          { name: 'YouTube Long', value: 'youtubelong', description: '16:9 crop + zoom' },
+        ],
+        default: 'zoompan',
+      },
+      {
+        displayName: 'Duration (Seconds)',
+        name: 'duration',
+        type: 'number',
+        displayOptions: {
+          show: {
+            operation: ['imageToVideo'],
+          },
+        },
+        default: 5,
+      },
+      {
+        displayName: 'Frame Rate',
+        name: 'frameRate',
+        type: 'number',
+        displayOptions: {
+          show: {
+            operation: ['imageToVideo'],
+          },
+        },
+        default: 25,
+      },
+      // ----------------------------------
       // Operation: Custom
       // ----------------------------------
       {
@@ -342,6 +389,43 @@ export class FFmpeg implements INodeType {
         } else if (operation === 'extractAudio') {
           outputExtension = this.getNodeParameter('audioFormat', i) as string;
           command.noVideo();
+
+        } else if (operation === 'imageToVideo') {
+          const preset = this.getNodeParameter('animationPreset', i) as string;
+          const duration = this.getNodeParameter('duration', i) as number;
+          const fps = this.getNodeParameter('frameRate', i) as number;
+          outputExtension = 'mp4';
+
+          // Input options for image loop
+          command.inputOptions(['-loop 1']);
+
+          // Output options
+          command.outputOptions([`-t ${duration}`, '-pix_fmt yuv420p']);
+
+          if (preset === 'zoompan') {
+            // ZoomPan effect: 5s duration default, but dynamic based on input
+            const frames = Math.ceil(duration * fps);
+            // "zoompan=z='min(zoom+0.0015,1.5)':d=125:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1280x720"
+            const filter = `zoompan=z='min(zoom+0.0015,1.5)':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1280x720`;
+            command.outputOptions(['-vf', filter, '-c:v libx264']);
+          } else if (preset === 'shorts') {
+            // YouTube Shorts: 9:16 crop + zoom
+            const frames = Math.ceil(duration * fps);
+            // "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,zoompan=..."
+            const zoomPart = `zoompan=z='min(zoom+0.0015,1.5)':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920`;
+            const filter = `scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${zoomPart}`;
+            command.outputOptions(['-vf', filter, '-c:v libx264']);
+          } else if (preset === 'youtubelong') {
+            // YouTube Long: 16:9 crop + zoom (1920x1080)
+            const frames = Math.ceil(duration * fps);
+            // "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=..."
+            const zoomPart = `zoompan=z='min(zoom+0.0015,1.5)':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080`;
+            const filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,${zoomPart}`;
+            command.outputOptions(['-vf', filter, '-c:v libx264']);
+          } else {
+            // Simple loop
+            command.outputOptions(['-c:v libx264', '-preset medium']);
+          }
 
         } else if (operation === 'custom') {
           outputExtension = this.getNodeParameter('outputExtension', i) as string;
