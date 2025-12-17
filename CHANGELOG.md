@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.0.2...v1.1.0) (2025-12-17)
+
+
+### Features
+
+* introduce FFmpeg Advanced node for comprehensive video and audio processing capabilities. ([8f24f1b](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/commit/8f24f1b69fbdc45851864b6847eb87ab856586bf))
+
 ## [1.0.2](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.0.1...v1.0.2) (2025-12-17)
 
 
