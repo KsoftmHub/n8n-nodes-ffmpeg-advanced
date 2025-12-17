@@ -1,6 +1,6 @@
 {
   "name": "@ksoftm/n8n-nodes-ffmpeg-advanced",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Advanced audiovisual processing node for n8n based on FFmpeg research",
   "keywords": [
     "n8n-community-node-package",

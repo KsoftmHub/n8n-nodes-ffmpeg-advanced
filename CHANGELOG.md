@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.1.0...v1.2.0) (2025-12-17)
+
+
+### Features
+
+* Add FFmpeg Advanced n8n node for comprehensive media processing including conversion, compression, and custom commands. ([21f7611](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/commit/21f761128950e57c5649013ba4fd1dd42e976b01))
+
 # [1.1.0](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.0.2...v1.1.0) (2025-12-17)
 
 
