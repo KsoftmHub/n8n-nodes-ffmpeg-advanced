@@ -76,45 +76,14 @@ export class FFmpeg implements INodeType {
             value: 'concatenate',
             description: 'Join multiple video files sequentially',
           },
-
+          {
+            name: 'Concatenate Videos',
+            value: 'concatenate',
+            description: 'Join multiple video files sequentially',
+          },
         ],
         default: 'convert',
       },
-      {
-        displayName: 'Input Source',
-        name: 'inputSource',
-        type: 'options',
-        options: [
-          {
-            name: 'Binary Field',
-            value: 'binary',
-          },
-          {
-            name: 'File Path',
-            value: 'path',
-          },
-        ],
-        default: 'binary',
-        displayOptions: {
-          show: {
-            operation: ['convert', 'compress', 'custom', 'imageToVideo', 'metadata'],
-          },
-        },
-      },
-      {
-        displayName: 'Input File Path',
-        name: 'inputPath',
-        type: 'string',
-        default: '',
-        placeholder: '/path/to/video.mp4',
-        displayOptions: {
-          show: {
-            inputSource: ['path'],
-            operation: ['convert', 'compress', 'custom', 'imageToVideo', 'metadata'],
-          },
-        },
-      },
-
       // ----------------------------------
       // Operation: Convert
       // ----------------------------------
@@ -294,6 +263,29 @@ export class FFmpeg implements INodeType {
       // Operation: Concatenate
       // ----------------------------------
       {
+        displayName: 'Concatenation Method',
+        name: 'concatenationMethod',
+        type: 'options',
+        options: [
+          {
+            name: 'Stream Copy (Fast, Same Codecs)',
+            value: 'copy',
+            description: 'Uses concat demuxer. Fast, no quality loss, but requires identical codecs/resolutions.',
+          },
+          {
+            name: 'Re-encode (Compatible, Different Codecs)',
+            value: 'reencode',
+            description: 'Uses concat filter. Slower, normalizes inputs to same format.',
+          },
+        ],
+        default: 'copy',
+        displayOptions: {
+          show: {
+            operation: ['concatenate'],
+          },
+        },
+      },
+      {
         displayName: 'Frame Rate',
         name: 'frameRate',
         type: 'number',
@@ -348,46 +340,6 @@ export class FFmpeg implements INodeType {
       // ----------------------------------
       // Operation: Concatenate
       // ----------------------------------
-      // ----------------------------------
-      // Operation: Concatenate
-      // ----------------------------------
-      {
-        displayName: 'Input Source',
-        name: 'inputSourceConcat',
-        type: 'options',
-        options: [
-          {
-            name: 'Binary Items (Multiple Items)',
-            value: 'binaryItems',
-            description: 'Use binary data from multiple incoming items',
-          },
-          {
-            name: 'File Paths (List/Array)',
-            value: 'pathList',
-            description: 'Use a list of file paths from a single item',
-          },
-        ],
-        default: 'binaryItems',
-        displayOptions: {
-          show: {
-            operation: ['concatenate'],
-          },
-        },
-      },
-      {
-        displayName: 'File Paths',
-        name: 'filesListField',
-        type: 'string',
-        default: '',
-        placeholder: '/tmp/video1.mp4, /tmp/video2.mp4',
-        description: 'Comma-separated paths or an expression resolving to an Array of strings',
-        displayOptions: {
-          show: {
-            operation: ['concatenate'],
-            inputSourceConcat: ['pathList'],
-          },
-        },
-      },
       {
         displayName: 'Concatenation Method',
         name: 'concatenationMethod',
@@ -484,16 +436,7 @@ export class FFmpeg implements INodeType {
         default: 'data',
         required: true,
         description: 'The name of the binary property containing the media file to process',
-        displayOptions: {
-          show: {
-            inputSource: ['binary'],
-          },
-          hide: {
-            operation: ['merge'],
-          }
-        },
       },
-
     ],
   };
 
@@ -503,69 +446,32 @@ export class FFmpeg implements INodeType {
     const tempDir = os.tmpdir();
 
     // Check for Aggregation Operation (Concatenate)
+    // We check the operation of the first item (assuming same operation for batch)
     const firstOperation = this.getNodeParameter('operation', 0) as string;
 
     if (firstOperation === 'concatenate') {
-      const inputSource = this.getNodeParameter('inputSourceConcat', 0, 'binaryItems') as string;
       const method = this.getNodeParameter('concatenationMethod', 0) as string;
+      const binaryPropertyName = this.getNodeParameter('binaryPropertyName', 0) as string;
       const saveToFile = this.getNodeParameter('saveToFile', 0) as boolean;
       const outputExtension = this.getNodeParameter('outputExtension', 0) as string;
 
       const inputFiles: string[] = [];
       const fileListPath = path.join(tempDir, `filelist_${uuidv4()}.txt`);
 
-      // Gather inputs based on Source
-      if (inputSource === 'pathList') {
-        // Single Item with List of Paths
-        const filesListInput = this.getNodeParameter('filesListField', 0) as string;
-        if (!filesListInput) {
-          throw new Error('File Paths field is empty');
+      // Gather all inputs
+      for (let i = 0; i < items.length; i++) {
+        if (!items[i].binary || !items[i].binary![binaryPropertyName]) {
+          continue; // Skip items without binary
         }
-
-        let paths: string[] = [];
-        if (Array.isArray(filesListInput)) {
-          paths = filesListInput;
-        } else if (typeof filesListInput === 'string') {
-          if (filesListInput.includes(',')) {
-            paths = filesListInput.split(',').map(p => p.trim());
-          } else {
-            paths = [filesListInput.trim()];
-          }
-        }
-
-        // Validate paths
-        for (const p of paths) {
-          if (!p) continue;
-          if (!fs.existsSync(p)) {
-            if (this.continueOnFail()) {
-              // Log warning?
-            } else {
-              throw new Error(`Input file not found: ${p}`);
-            }
-          }
-          inputFiles.push(p);
-        }
-
-      } else {
-        // Binary Items (Legacy / Default)
-        const binaryPropertyName = this.getNodeParameter('binaryPropertyName', 0) as string;
-        for (let i = 0; i < items.length; i++) {
-          if (!items[i].binary || !items[i].binary![binaryPropertyName]) {
-            continue;
-          }
-          const inputBuffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
-          const inputFileName = `concat_in_${i}_${uuidv4()}.${outputExtension}`;
-          const inputFilePath = path.join(tempDir, inputFileName);
-          fs.writeFileSync(inputFilePath, inputBuffer);
-          inputFiles.push(inputFilePath);
-        }
+        const inputBuffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+        const inputFileName = `concat_in_${i}_${uuidv4()}.${outputExtension}`; // Try to match ext
+        const inputFilePath = path.join(tempDir, inputFileName);
+        fs.writeFileSync(inputFilePath, inputBuffer);
+        inputFiles.push(inputFilePath);
       }
 
       if (inputFiles.length === 0) {
-        if (this.continueOnFail()) {
-          return [items];
-        }
-        throw new Error('No valid input files found for concatenation');
+        return [[]]; // No inputs
       }
 
       let command: ffmpeg.FfmpegCommand;
@@ -573,6 +479,7 @@ export class FFmpeg implements INodeType {
       const outputFilePath = path.join(tempDir, `${outputFileName}.${outputExtension}`);
 
       if (method === 'copy') {
+        // Create filelist.txt
         const fileListContent = inputFiles.map(f => `file '${f}'`).join('\n');
         fs.writeFileSync(fileListPath, fileListContent);
 
@@ -582,12 +489,20 @@ export class FFmpeg implements INodeType {
           .inputOptions(['-f concat', '-safe 0'])
           .outputOptions('-c copy');
       } else {
+        // Re-encode
         command = ffmpeg();
         inputFiles.forEach(f => command.input(f));
+
+        // Complex filter: concat=n=inputs:v=1:a=1
+        // We assume audio exists for simplicity, or we could check.
+        // Defaulting to v=1:a=1 is standard for standard video files.
         command.complexFilter(`concat=n=${inputFiles.length}:v=1:a=1`);
+
+        // Could add default encoding options here if needed, e.g. -c:v libx264
         command.outputOptions('-c:v libx264');
       }
 
+      // Execute
       await new Promise((resolve, reject) => {
         command
           .on('end', () => resolve(true))
@@ -595,8 +510,10 @@ export class FFmpeg implements INodeType {
           .save(outputFilePath);
       });
 
+      // Prepare Output
       if (saveToFile) {
         const targetPath = this.getNodeParameter('filePath', 0) as string;
+        // Ensure dir exists... same logic as loop
         const targetDir = path.dirname(targetPath);
         if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
         fs.copyFileSync(outputFilePath, targetPath);
@@ -608,8 +525,9 @@ export class FFmpeg implements INodeType {
       } else {
         const outputBuffer = fs.readFileSync(outputFilePath);
         const binaryData: IBinaryKeyData = {};
-        binaryData['data'] = await this.helpers.prepareBinaryData(outputBuffer, `${outputFileName}.${outputExtension}`);
+        binaryData[binaryPropertyName] = await this.helpers.prepareBinaryData(outputBuffer, `${outputFileName}.${outputExtension}`);
 
+        // Return single item (aggregation)
         returnData.push({
           json: { ...items[0].json, concatenatedCount: inputFiles.length },
           binary: binaryData
@@ -617,78 +535,73 @@ export class FFmpeg implements INodeType {
       }
 
       // Cleanup
-      if (inputSource === 'binaryItems') {
-        inputFiles.forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
-      }
+      inputFiles.forEach(f => { if (fs.existsSync(f)) fs.unlinkSync(f); });
       if (fs.existsSync(fileListPath)) fs.unlinkSync(fileListPath);
       if (fs.existsSync(outputFilePath)) fs.unlinkSync(outputFilePath);
 
       return [returnData];
     }
 
-    // Standard Loop
+    // Original Loop for Non-Aggregate Operations
     for (let i = 0; i < items.length; i++) {
       try {
         const operation = this.getNodeParameter('operation', i) as string;
+        const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
         const saveToFile = this.getNodeParameter('saveToFile', i) as boolean;
-        const inputSource = this.getNodeParameter('inputSource', i, 'binary') as string;
+
+
+
+        if (!items[i].binary || !items[i].binary![binaryPropertyName]) {
+          throw new Error(`Item ${i} does not contain binary data with name "${binaryPropertyName}"`);
+        }
+
+        const inputBuffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+        const tempDir = os.tmpdir();
 
         let command: ffmpeg.FfmpegCommand;
         const tempFilesToDelete: string[] = [];
-        const tempDir = os.tmpdir();
-
-        // 1. Prepare Input
-        let inputFilePath = '';
 
         if (operation === 'merge') {
           const videoProp = this.getNodeParameter('videoBinaryProperty', i) as string;
           const audioProp = this.getNodeParameter('audioBinaryProperty', i) as string;
 
-          // Merge currently only supports binary inputs based on existing properties
-          // Converting to path support would require structural changes to 'merge' props
-          // For now, keeping as is or we can add path support if requested.
-          // User request was generic "Getting duplickets...".
-          // I will leave merge as-is but respect check for props.
+          if (!items[i].binary || !items[i].binary![videoProp] || !items[i].binary![audioProp]) {
+            throw new Error(`Item ${i} must contain both binary data properties: "${videoProp}" and "${audioProp}"`);
+          }
 
           const videoBuffer = await this.helpers.getBinaryDataBuffer(i, videoProp);
           const audioBuffer = await this.helpers.getBinaryDataBuffer(i, audioProp);
 
-          const videoPath = path.join(tempDir, `video_in_${uuidv4()}`);
-          const audioPath = path.join(tempDir, `audio_in_${uuidv4()}`);
+          const videoFileName = `video_in_${uuidv4()}`;
+          const audioFileName = `audio_in_${uuidv4()}`;
+          const videoPath = path.join(tempDir, videoFileName);
+          const audioPath = path.join(tempDir, audioFileName);
 
           fs.writeFileSync(videoPath, videoBuffer);
           fs.writeFileSync(audioPath, audioBuffer);
           tempFilesToDelete.push(videoPath, audioPath);
 
+          // Initialize FFmpeg with Video Input
           command = ffmpeg(videoPath).input(audioPath);
-
-        } else if (inputSource === 'path') {
-          inputFilePath = this.getNodeParameter('inputPath', i) as string;
-          if (!inputFilePath || !fs.existsSync(inputFilePath)) {
-            throw new Error(`Input file not found: ${inputFilePath}`);
-          }
-          command = ffmpeg(inputFilePath);
-
         } else {
-          // Binary Input
-          const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
-          if (!items[i].binary || !items[i].binary![binaryPropertyName]) {
-            throw new Error(`Item ${i} does not contain binary data with name "${binaryPropertyName}"`);
-          }
-          const inputBuffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
-          inputFilePath = path.join(tempDir, `input_${uuidv4()}`);
+          const inputFileName = `input_${uuidv4()}`;
+          const inputFilePath = path.join(tempDir, inputFileName);
+
+          // Write binary to disk (FFmpeg needs file paths for best performance)
           fs.writeFileSync(inputFilePath, inputBuffer);
           tempFilesToDelete.push(inputFilePath);
 
+          // Initialize FFmpeg
           command = ffmpeg(inputFilePath);
         }
 
-        // 2. Metadata
         if (operation === 'metadata') {
-          // For metadata, we need to ensure we have a valid input path.
-          // If binary, inputFilePath is set. If path, inputFilePath is set.
+          // Handle Metadata Analysis
+          // For metadata, we used 'inputFilePath' which might not exist in scope or match logic above.
+          // We can use the first file in tempFilesToDelete as the primary input.
           const metadata = await new Promise((resolve, reject) => {
-            ffmpeg.ffprobe(items[i].json.inputPath as string || inputFilePath, (err, metadata) => {
+            const primaryInput = tempFilesToDelete[0];
+            ffmpeg.ffprobe(primaryInput, (err, metadata) => {
               if (err) reject(err);
               else resolve(metadata);
             });
@@ -698,14 +611,18 @@ export class FFmpeg implements INodeType {
             json: metadata as any,
             binary: items[i].binary,
           });
+
+          // Cleanup
+          // Cleanup
           tempFilesToDelete.forEach(p => { if (fs.existsSync(p)) fs.unlinkSync(p); });
           continue;
         }
 
-        // 3. Configure Output
+        // Handle Processing Operations
         let outputFileName = `output_${uuidv4()}`;
         let outputExtension = 'mp4';
 
+        // Configure Command based on Operation
         if (operation === 'convert') {
           outputExtension = this.getNodeParameter('format', i) as string;
           const resolution = this.getNodeParameter('resolution', i) as string;
@@ -714,52 +631,79 @@ export class FFmpeg implements INodeType {
           const audioCodec = this.getNodeParameter('audioCodec', i) as string;
           const streamingOpt = this.getNodeParameter('streamingOpt', i) as boolean;
 
-          if (resolution !== 'original') command.size(resolution);
-          if (videoCodec !== 'auto') command.videoCodec(videoCodec);
-          if (audioCodec !== 'auto') command.audioCodec(audioCodec);
+          if (resolution !== 'original') {
+            command.size(resolution);
+          }
+
+          // Apply Video Codec
+          if (videoCodec !== 'auto') {
+            command.videoCodec(videoCodec);
+          }
+
+          // Apply Audio Codec
+          if (audioCodec !== 'auto') {
+            command.audioCodec(audioCodec);
+          }
+
+          // Apply Streaming Optimizations
           if (streamingOpt) {
+            // Flags for low latency and no buffer (Real-time streaming optimization)
             command.addOption('-fflags', 'nobuffer');
             command.addOption('-flags', 'low_delay');
+            // Tune for zero latency if using x264
             if (videoCodec === 'libx264' || videoCodec === 'auto') {
               command.addOption('-tune', 'zerolatency');
             }
           }
+
           command.outputOptions(`-preset ${preset}`);
 
         } else if (operation === 'compress') {
           const crf = this.getNodeParameter('crf', i) as number;
           const preset = this.getNodeParameter('preset', i) as string;
-          command.videoCodec('libx264').outputOptions(`-crf ${crf}`).outputOptions(`-preset ${preset}`);
+          // Standard H.264 compression settings
+          command.videoCodec('libx264')
+            .outputOptions(`-crf ${crf}`)
+            .outputOptions(`-preset ${preset}`);
 
         } else if (operation === 'extractAudio') {
           outputExtension = this.getNodeParameter('audioFormat', i) as string;
           command.noVideo();
 
         } else if (operation === 'imageToVideo') {
-          // For imageToVideo, input is usually an image binary or path.
-          // Existing logic: command.inputOptions(['-loop 1']);
-          // Handled naturally by command init above.
           const preset = this.getNodeParameter('animationPreset', i) as string;
           const duration = this.getNodeParameter('duration', i) as number;
           const fps = this.getNodeParameter('frameRate', i) as number;
           outputExtension = 'mp4';
 
+          // Input options for image loop
           command.inputOptions(['-loop 1']);
+
+          // Output options
           command.outputOptions([`-t ${duration}`, '-pix_fmt yuv420p']);
 
-          const frames = Math.ceil(duration * fps);
           if (preset === 'zoompan') {
+            // ZoomPan effect: 5s duration default, but dynamic based on input
+            const frames = Math.ceil(duration * fps);
+            // "zoompan=z='min(zoom+0.0015,1.5)':d=125:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1280x720"
             const filter = `zoompan=z='min(zoom+0.0015,1.5)':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1280x720`;
             command.outputOptions(['-vf', filter, '-c:v libx264']);
           } else if (preset === 'shorts') {
+            // YouTube Shorts: 9:16 crop + zoom
+            const frames = Math.ceil(duration * fps);
+            // "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,zoompan=..."
             const zoomPart = `zoompan=z='min(zoom+0.0015,1.5)':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920`;
             const filter = `scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${zoomPart}`;
             command.outputOptions(['-vf', filter, '-c:v libx264']);
           } else if (preset === 'youtubelong') {
+            // YouTube Long: 16:9 crop + zoom (1920x1080)
+            const frames = Math.ceil(duration * fps);
+            // "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=..."
             const zoomPart = `zoompan=z='min(zoom+0.0015,1.5)':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080`;
             const filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,${zoomPart}`;
             command.outputOptions(['-vf', filter, '-c:v libx264']);
           } else {
+            // Simple loop
             command.outputOptions(['-c:v libx264', '-preset medium']);
           }
 
@@ -767,10 +711,27 @@ export class FFmpeg implements INodeType {
           outputExtension = this.getNodeParameter('outputExtension', i) as string;
           const args = (this.getNodeParameter('customArgs', i) as string).split(' ');
           command.outputOptions(args);
+
+        } else if (operation === 'merge') {
+          outputExtension = this.getNodeParameter('format', i) as string;
+          const videoCodec = this.getNodeParameter('videoCodec', i) as string;
+          const audioCodec = this.getNodeParameter('audioCodec', i) as string;
+          const shortest = this.getNodeParameter('shortest', i) as boolean;
+
+          if (videoCodec !== 'auto') {
+            command.videoCodec(videoCodec);
+          }
+          if (audioCodec !== 'auto') {
+            command.audioCodec(audioCodec);
+          }
+          if (shortest) {
+            command.outputOptions('-shortest');
+          }
         }
 
         const outputFilePath = path.join(tempDir, `${outputFileName}.${outputExtension}`);
 
+        // Execute FFmpeg
         await new Promise((resolve, reject) => {
           command
             .on('end', () => resolve(true))
@@ -779,31 +740,43 @@ export class FFmpeg implements INodeType {
         });
 
         if (saveToFile) {
+          // Save to specific path
           const targetPath = this.getNodeParameter('filePath', i) as string;
-          if (!targetPath) throw new Error('File path required for save');
+
+          if (!targetPath) {
+            throw new Error('File path is required when "Save to File" is enabled.');
+          }
+
+          // Ensure directory exists
           const targetDir = path.dirname(targetPath);
-          if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+          if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+          }
+
           fs.copyFileSync(outputFilePath, targetPath);
 
           returnData.push({
-            json: { ...items[i].json, saved: true, outputFilePath: targetPath },
-            binary: {}
+            json: {
+              ...items[i].json,
+              outputFilePath: targetPath,
+              saved: true
+            },
+            binary: {},
           });
+
         } else {
+          // Return as Binary Data
           const outputBuffer = fs.readFileSync(outputFilePath);
+
           const customFileName = this.getNodeParameter('fileName', i) as string;
           const finalFileName = customFileName ? `${customFileName}.${outputExtension}` : `${outputFileName}.${outputExtension}`;
 
-          // We need to decide which PROPERTY to put output in.
-          // Usually same as input check, or default 'data'.
-          // If 'path' input, we don't have a binary property name. Default to 'data'.
-          let outBinProp = 'data';
-          if (inputSource === 'binary') {
-            outBinProp = this.getNodeParameter('binaryPropertyName', i) as string;
-          }
-
+          // Prepare Binary Data
           const binaryData: IBinaryKeyData = {};
-          binaryData[outBinProp] = await this.helpers.prepareBinaryData(outputBuffer, finalFileName);
+          binaryData[binaryPropertyName] = await this.helpers.prepareBinaryData(
+            outputBuffer,
+            finalFileName
+          );
 
           returnData.push({
             json: items[i].json,
@@ -811,7 +784,7 @@ export class FFmpeg implements INodeType {
           });
         }
 
-        // Cleanup
+        // Cleanup temporary files
         tempFilesToDelete.forEach(p => { if (fs.existsSync(p)) fs.unlinkSync(p); });
         if (fs.existsSync(outputFilePath)) fs.unlinkSync(outputFilePath);
 

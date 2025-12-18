@@ -26,7 +26,6 @@ Change format, resolution, or codec.
 - **Codecs**:
   - Video: `Auto`, `H.264 (libx264)`, `VP9 (libvpx-vp9)`.
   - Audio: `Auto`, `AAC`, `Opus`.
-- **Input Source**: `Binary Field` (default) or `File Path` (string path).
 - **Resolution**: `1080p`, `720p`, `480p`, or `Keep Original`.
 - **Streaming Optimization**: Enable low-latency and no-buffer flags for real-time needs.
 
@@ -61,10 +60,7 @@ Combine a video stream and an audio stream.
 - **Codecs**: "Copy" mode available for zero-loss merging.
 
 ### 8. Concatenate Videos
-Join multiple video files sequentially into a single file.
-- **Input Source**:
-  - `Binary Items`: Aggregates binary data from multiple incoming items.
-  - `File Paths (List/Array)`: Accepts a list of paths from a single item.
+Join multiple video files sequentially into a single file. (Aggregates all input items).
 - **Concatenation Method**:
   - `Stream Copy`: Fast, no quality loss. Requires inputs to have identical codecs and resolutions.
   - `Re-encode`: Slower, but can join videos with different properties.
@@ -108,7 +104,7 @@ npm install @ksoftm/n8n-nodes-ffmpeg-advanced
 
 ## ⚠️ Requirements
 
-- **Input**: This node requires a binary input field (default: `data`) OR a valid absolute file path.
+- **Binary Data**: This node requires a binary input field (default: `data`).
 - **Memory**: Processing large video files requires significant RAM. Ensure your n8n instance has sufficient resources.
 - **Dependencies**: This package includes `@ffmpeg-installer/ffmpeg` to provide the necessary binaries automatically.
 
