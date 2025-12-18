@@ -59,6 +59,13 @@ Combine a video stream and an audio stream.
 - **Shortest**: Option to finish encoding when the shortest input ends.
 - **Codecs**: "Copy" mode available for zero-loss merging.
 
+### 8. Concatenate Videos
+Join multiple video files sequentially into a single file. (Aggregates all input items).
+- **Concatenation Method**:
+  - `Stream Copy`: Fast, no quality loss. Requires inputs to have identical codecs and resolutions.
+  - `Re-encode`: Slower, but can join videos with different properties.
+- **Output Extension**: Specify the container for the final video (e.g. `mp4`).
+
 ## 💡 Usage Scenarios
 
 ### Scenario A: Optimization Pipeline
