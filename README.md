@@ -17,6 +17,7 @@ Stop wrestling with complex command-line arguments. This node gives you a powerf
 - **Custom Commands**: Run complex FFmpeg filters and arguments for unlimited power.
 - **Streaming Optimization**: Built-in flags for low-latency streaming applications.
 - **Merge Streams**: Combine video and audio from different sources into a single file.
+- **Smooth Motion (VFI)**: Generate intermediate frames using Motion Compensated Interpolation for deeper fluidity.
 
 ## 📦 Operations
 
@@ -29,6 +30,7 @@ Change format, resolution, or codec.
 - **Input Source**: `Binary Field` (default) or `File Path` (string path).
 - **Resolution**: `1080p`, `720p`, `480p`, or `Keep Original`.
 - **Streaming Optimization**: Enable low-latency and no-buffer flags for real-time needs.
+- **Smooth Motion**: Optionally enable VFI to increase frame rate (default 60fps) using motion compensation.
 
 ### 2. Compress (Optimize)
 Reduce file size efficiently.
@@ -53,6 +55,7 @@ Run raw FFmpeg arguments.
 Create video from a static image with animation presets.
 - **Presets**: `Zoom Pan`, `Simple Loop`, `YouTube Shorts` (9:16), `YouTube Long` (16:9).
 - **Duration**: Set the length of the resulting video.
+- **Smooth Motion**: Apply VFI to make zoom/pan effects significantly smoother effectively increasing temporal resolution.
 
 ### 7. Merge Video & Audio
 Combine a video stream and an audio stream.

@@ -202,6 +202,58 @@ export class FFmpeg implements INodeType {
         description: 'Apply low-latency flags (-fflags nobuffer -flags low_delay) and tuning',
       },
       // ----------------------------------
+      // VFI / Smoothness
+      // ----------------------------------
+      {
+        displayName: 'Smooth Motion (VFI)',
+        name: 'enableInterpolation',
+        type: 'boolean',
+        displayOptions: {
+          show: {
+            operation: ['convert', 'imageToVideo'],
+          },
+        },
+        default: false,
+        description: 'Use Motion Compensated Interpolation to generate intermediate frames for smoother video. Warning: Slows down processing significantly.',
+      },
+      {
+        displayName: 'Target FPS',
+        name: 'interpolationFps',
+        type: 'number',
+        displayOptions: {
+          show: {
+            operation: ['convert', 'imageToVideo'],
+            enableInterpolation: [true],
+          },
+        },
+        default: 60,
+        description: 'Target frame rate for the output video',
+      },
+      {
+        displayName: 'Interpolation Mode',
+        name: 'interpolationMode',
+        type: 'options',
+        options: [
+          {
+            name: 'Motion Compensated (MCI)',
+            value: 'mci',
+            description: 'High quality, uses optical flow',
+          },
+          {
+            name: 'Blend (Frame Mix)',
+            value: 'blend',
+            description: 'Fast, creates ghosting effects',
+          },
+        ],
+        displayOptions: {
+          show: {
+            operation: ['convert', 'imageToVideo'],
+            enableInterpolation: [true],
+          },
+        },
+        default: 'mci',
+      },
+      // ----------------------------------
       // Operation: Compress
       // ----------------------------------
       {
@@ -724,6 +776,16 @@ export class FFmpeg implements INodeType {
               command.addOption('-tune', 'zerolatency');
             }
           }
+
+          // VFI Logic for Convert
+          const enableInterpolation = this.getNodeParameter('enableInterpolation', i, false) as boolean;
+          if (enableInterpolation) {
+            const fps = this.getNodeParameter('interpolationFps', i, 60) as number;
+            const mode = this.getNodeParameter('interpolationMode', i, 'mci') as string;
+            // Use videoFilters method from fluent-ffmpeg
+            command.videoFilters(`minterpolate=fps=${fps}:mi_mode=${mode}`);
+          }
+
           command.outputOptions(`-preset ${preset}`);
 
         } else if (operation === 'compress') {
@@ -748,18 +810,36 @@ export class FFmpeg implements INodeType {
           command.outputOptions([`-t ${duration}`, '-pix_fmt yuv420p']);
 
           const frames = Math.ceil(duration * fps);
+
+          // VFI Logic preparation
+          const enableInterpolation = this.getNodeParameter('enableInterpolation', i, false) as boolean;
+          let vfiFilter = '';
+          if (enableInterpolation) {
+            const iFps = this.getNodeParameter('interpolationFps', i, 60) as number;
+            const mode = this.getNodeParameter('interpolationMode', i, 'mci') as string;
+            // Prioritize interpolation FPS if enabled, but usually we just add the filter
+            vfiFilter = `,minterpolate=fps=${iFps}:mi_mode=${mode}`;
+          }
+
           if (preset === 'zoompan') {
-            const filter = `zoompan=z='min(zoom+0.0015,1.5)':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1280x720`;
+            const filter = `zoompan=z='min(zoom+0.0015,1.5)':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1280x720${vfiFilter}`;
             command.outputOptions(['-vf', filter, '-c:v libx264']);
           } else if (preset === 'shorts') {
             const zoomPart = `zoompan=z='min(zoom+0.0015,1.5)':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920`;
-            const filter = `scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${zoomPart}`;
+            const filter = `scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${zoomPart}${vfiFilter}`;
             command.outputOptions(['-vf', filter, '-c:v libx264']);
           } else if (preset === 'youtubelong') {
             const zoomPart = `zoompan=z='min(zoom+0.0015,1.5)':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080`;
-            const filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,${zoomPart}`;
+            const filter = `scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,${zoomPart}${vfiFilter}`;
             command.outputOptions(['-vf', filter, '-c:v libx264']);
           } else {
+            if (enableInterpolation) {
+              // Simple case with just interpolation
+              // command.videoFilters doesn't always mix well with manual -vf in some cases, but here 'simple' preset has no filters yet
+              // but we must be careful.
+              // minterpolate requires input.
+              command.videoFilters(vfiFilter.replace(',', '')); // remove leading comma
+            }
             command.outputOptions(['-c:v libx264', '-preset medium']);
           }
 
