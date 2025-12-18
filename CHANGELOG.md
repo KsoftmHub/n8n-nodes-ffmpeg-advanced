@@ -1,3 +1,15 @@
+# [1.4.0](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.3.0...v1.4.0) (2025-12-18)
+
+
+### Bug Fixes
+
+* clarify file paths input for concatenation and add output options for saving to file. ([edb3fae](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/commit/edb3fae4a5177a9eb04639a1f9d6f56eebe48b94))
+
+
+### Features
+
+* introduce FFmpeg Advanced node supporting various video/audio operations with flexible binary or file path inputs. ([105242a](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/commit/105242a78fccd89bf62cf32cbd0c801397642fc0))
+
 # [1.3.0](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.2.0...v1.3.0) (2025-12-18)
 
 
