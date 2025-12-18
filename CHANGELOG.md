@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.4.0...v1.5.0) (2025-12-18)
+
+
+### Features
+
+* add FFmpeg Advanced node with video frame interpolation and other video processing capabilities. ([7165291](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/commit/7165291616d8c12b7706ac8a027cc35c1ea05a9e))
+
 # [1.4.0](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.3.0...v1.4.0) (2025-12-18)
 
 
