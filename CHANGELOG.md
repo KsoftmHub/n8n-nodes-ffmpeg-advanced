@@ -1,3 +1,11 @@
+# [1.3.0](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.2.0...v1.3.0) (2025-12-18)
+
+
+### Features
+
+* Add new FFmpeg Advanced node for comprehensive media processing and update README. ([e91bf3a](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/commit/e91bf3a5b4e18d299014883b6f2d6e804b28125d))
+* add new FFmpeg node implementing image to video and merge video/audio operations with updated documentation. ([61c1f37](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/commit/61c1f3778c92d392aa3ac0cfe6b54c30678fe7e8))
+
 # [1.2.0](https://github.com/KsoftmHub/n8n-nodes-ffmpeg-advanced/compare/v1.1.0...v1.2.0) (2025-12-17)
 
 
