@@ -64,11 +64,17 @@ Combine a video stream and an audio stream.
 Join multiple video files sequentially into a single file.
 - **Input Source**:
   - `Binary Items`: Aggregates binary data from multiple incoming items.
-  - `File Paths (List/Array)`: Accepts a list of paths from a single item.
+  - `File Paths (List/Array)`: Accepts a list of paths from a single item. Can be an array of strings or a comma-separated string (e.g., `/tmp/v1.mp4, /tmp/v2.mp4`).
 - **Concatenation Method**:
   - `Stream Copy`: Fast, no quality loss. Requires inputs to have identical codecs and resolutions.
   - `Re-encode`: Slower, but can join videos with different properties.
 - **Output Extension**: Specify the container for the final video (e.g. `mp4`).
+
+### 9. Output Options (Save to File)
+By default, the node returns binary data. You can optionally save the output directly to disk.
+- **Save to File**: Toggle to enable direct file saving.
+- **Output File Path**: Absolute path where the file should be saved (e.g., `/var/www/html/video.mp4`).
+- **Output Filename**: (If not saving to file) Specify a custom filename for the binary data output.
 
 ## 💡 Usage Scenarios
 
