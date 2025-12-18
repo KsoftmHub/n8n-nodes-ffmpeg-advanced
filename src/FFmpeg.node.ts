@@ -66,6 +66,11 @@ export class FFmpeg implements INodeType {
             value: 'imageToVideo',
             description: 'Convert static image to video with effects',
           },
+          {
+            name: 'Merge Video & Audio',
+            value: 'merge',
+            description: 'Combine video and audio from different sources',
+          },
         ],
         default: 'convert',
       },
@@ -78,7 +83,7 @@ export class FFmpeg implements INodeType {
         type: 'options',
         displayOptions: {
           show: {
-            operation: ['convert'],
+            operation: ['convert', 'merge'],
           },
         },
         options: [
@@ -97,11 +102,12 @@ export class FFmpeg implements INodeType {
         type: 'options',
         displayOptions: {
           show: {
-            operation: ['convert'],
+            operation: ['convert', 'merge'],
           },
         },
         options: [
           { name: 'Auto', value: 'auto' },
+          { name: 'Copy (Stream Copy)', value: 'copy' },
           { name: 'H.264 (libx264)', value: 'libx264' },
           { name: 'VP9 (libvpx-vp9)', value: 'libvpx-vp9' },
         ],
@@ -114,7 +120,7 @@ export class FFmpeg implements INodeType {
         type: 'options',
         displayOptions: {
           show: {
-            operation: ['convert'],
+            operation: ['convert', 'merge'],
           },
         },
         options: [
@@ -255,6 +261,47 @@ export class FFmpeg implements INodeType {
         default: 25,
       },
       // ----------------------------------
+      // Operation: Merge
+      // ----------------------------------
+      {
+        displayName: 'Video Binary Field',
+        name: 'videoBinaryProperty',
+        type: 'string',
+        default: 'video',
+        required: true,
+        displayOptions: {
+          show: {
+            operation: ['merge'],
+          },
+        },
+        description: 'The name of the binary property containing the video file',
+      },
+      {
+        displayName: 'Audio Binary Field',
+        name: 'audioBinaryProperty',
+        type: 'string',
+        default: 'audio',
+        required: true,
+        displayOptions: {
+          show: {
+            operation: ['merge'],
+          },
+        },
+        description: 'The name of the binary property containing the audio file',
+      },
+      {
+        displayName: 'Shortest',
+        name: 'shortest',
+        type: 'boolean',
+        default: false,
+        displayOptions: {
+          show: {
+            operation: ['merge'],
+          },
+        },
+        description: 'Finish encoding when the shortest input stream ends',
+      },
+      // ----------------------------------
       // Operation: Custom
       // ----------------------------------
       {
@@ -348,19 +395,51 @@ export class FFmpeg implements INodeType {
 
         const inputBuffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
         const tempDir = os.tmpdir();
-        const inputFileName = `input_${uuidv4()}`;
-        const inputFilePath = path.join(tempDir, inputFileName);
 
-        // Write binary to disk (FFmpeg needs file paths for best performance)
-        fs.writeFileSync(inputFilePath, inputBuffer);
+        let command: ffmpeg.FfmpegCommand;
+        const tempFilesToDelete: string[] = [];
 
-        // Initialize FFmpeg
-        let command = ffmpeg(inputFilePath);
+        if (operation === 'merge') {
+          const videoProp = this.getNodeParameter('videoBinaryProperty', i) as string;
+          const audioProp = this.getNodeParameter('audioBinaryProperty', i) as string;
+
+          if (!items[i].binary || !items[i].binary![videoProp] || !items[i].binary![audioProp]) {
+            throw new Error(`Item ${i} must contain both binary data properties: "${videoProp}" and "${audioProp}"`);
+          }
+
+          const videoBuffer = await this.helpers.getBinaryDataBuffer(i, videoProp);
+          const audioBuffer = await this.helpers.getBinaryDataBuffer(i, audioProp);
+
+          const videoFileName = `video_in_${uuidv4()}`;
+          const audioFileName = `audio_in_${uuidv4()}`;
+          const videoPath = path.join(tempDir, videoFileName);
+          const audioPath = path.join(tempDir, audioFileName);
+
+          fs.writeFileSync(videoPath, videoBuffer);
+          fs.writeFileSync(audioPath, audioBuffer);
+          tempFilesToDelete.push(videoPath, audioPath);
+
+          // Initialize FFmpeg with Video Input
+          command = ffmpeg(videoPath).input(audioPath);
+        } else {
+          const inputFileName = `input_${uuidv4()}`;
+          const inputFilePath = path.join(tempDir, inputFileName);
+
+          // Write binary to disk (FFmpeg needs file paths for best performance)
+          fs.writeFileSync(inputFilePath, inputBuffer);
+          tempFilesToDelete.push(inputFilePath);
+
+          // Initialize FFmpeg
+          command = ffmpeg(inputFilePath);
+        }
 
         if (operation === 'metadata') {
           // Handle Metadata Analysis
+          // For metadata, we used 'inputFilePath' which might not exist in scope or match logic above.
+          // We can use the first file in tempFilesToDelete as the primary input.
           const metadata = await new Promise((resolve, reject) => {
-            ffmpeg.ffprobe(inputFilePath, (err, metadata) => {
+            const primaryInput = tempFilesToDelete[0];
+            ffmpeg.ffprobe(primaryInput, (err, metadata) => {
               if (err) reject(err);
               else resolve(metadata);
             });
@@ -372,7 +451,8 @@ export class FFmpeg implements INodeType {
           });
 
           // Cleanup
-          if (fs.existsSync(inputFilePath)) fs.unlinkSync(inputFilePath);
+          // Cleanup
+          tempFilesToDelete.forEach(p => { if (fs.existsSync(p)) fs.unlinkSync(p); });
           continue;
         }
 
@@ -469,6 +549,22 @@ export class FFmpeg implements INodeType {
           outputExtension = this.getNodeParameter('outputExtension', i) as string;
           const args = (this.getNodeParameter('customArgs', i) as string).split(' ');
           command.outputOptions(args);
+
+        } else if (operation === 'merge') {
+          outputExtension = this.getNodeParameter('format', i) as string;
+          const videoCodec = this.getNodeParameter('videoCodec', i) as string;
+          const audioCodec = this.getNodeParameter('audioCodec', i) as string;
+          const shortest = this.getNodeParameter('shortest', i) as boolean;
+
+          if (videoCodec !== 'auto') {
+            command.videoCodec(videoCodec);
+          }
+          if (audioCodec !== 'auto') {
+            command.audioCodec(audioCodec);
+          }
+          if (shortest) {
+            command.outputOptions('-shortest');
+          }
         }
 
         const outputFilePath = path.join(tempDir, `${outputFileName}.${outputExtension}`);
@@ -486,13 +582,13 @@ export class FFmpeg implements INodeType {
           const targetPath = this.getNodeParameter('filePath', i) as string;
 
           if (!targetPath) {
-             throw new Error('File path is required when "Save to File" is enabled.');
+            throw new Error('File path is required when "Save to File" is enabled.');
           }
 
           // Ensure directory exists
           const targetDir = path.dirname(targetPath);
           if (!fs.existsSync(targetDir)) {
-             fs.mkdirSync(targetDir, { recursive: true });
+            fs.mkdirSync(targetDir, { recursive: true });
           }
 
           fs.copyFileSync(outputFilePath, targetPath);
@@ -527,7 +623,7 @@ export class FFmpeg implements INodeType {
         }
 
         // Cleanup temporary files
-        if (fs.existsSync(inputFilePath)) fs.unlinkSync(inputFilePath);
+        tempFilesToDelete.forEach(p => { if (fs.existsSync(p)) fs.unlinkSync(p); });
         if (fs.existsSync(outputFilePath)) fs.unlinkSync(outputFilePath);
 
       } catch (error) {

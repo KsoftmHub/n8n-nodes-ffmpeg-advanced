@@ -16,6 +16,7 @@ Stop wrestling with complex command-line arguments. This node gives you a powerf
 - **Metadata Analysis**: Get detailed JSON analysis of media streams using `ffprobe`.
 - **Custom Commands**: Run complex FFmpeg filters and arguments for unlimited power.
 - **Streaming Optimization**: Built-in flags for low-latency streaming applications.
+- **Merge Streams**: Combine video and audio from different sources into a single file.
 
 ## 📦 Operations
 
@@ -47,6 +48,17 @@ Run raw FFmpeg arguments.
 - **Arguments**: Enter flags like `-c:v libx264 -preset slow`.
 - **Output Extension**: Specify the expected output format.
 
+### 6. Image to Video
+Create video from a static image with animation presets.
+- **Presets**: `Zoom Pan`, `Simple Loop`, `YouTube Shorts` (9:16), `YouTube Long` (16:9).
+- **Duration**: Set the length of the resulting video.
+
+### 7. Merge Video & Audio
+Combine a video stream and an audio stream.
+- **Video/Audio Inputs**: Specify the binary property names for video and audio (e.g., `video` and `audio`).
+- **Shortest**: Option to finish encoding when the shortest input ends.
+- **Codecs**: "Copy" mode available for zero-loss merging.
+
 ## 💡 Usage Scenarios
 
 ### Scenario A: Optimization Pipeline
@@ -68,8 +80,14 @@ Convert a short product demo video into a GIF for an email campaign.
 
 ### Scenario D: Advanced Filtering
 Apply a specific watermark or filter complex not covered by standard options.
-1. **Operation**: `Custom Command`.
 2. **Arguments**: `-vf "drawtext=text='Watermark':x=10:y=10:fontsize=24:fontcolor=white"`.
+
+### Scenario E: Merging Audio to Video
+You have a silent video and a separate voiceover track.
+1. **Operation**: `Merge Video & Audio`.
+2. **Video Binary Field**: `video`.
+3. **Audio Binary Field**: `audio`.
+4. **Video Codec**: `Copy` (Fastest, no quality loss).
 
 ## 📥 Installation
 
